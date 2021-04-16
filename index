@@ -35,7 +35,7 @@ __device__ void gpu_bottomUpMerge(Punto*, Punto*, long, long, long);
 ***/
 #define LIMITE 100
 #define TAPP 25 //Tamaño de árbol por procesador
-#define CANTPROC 1
+#define CANTPROC 4
 #define TMAXNODES 8
 
 __device__ OneTree t[CANTPROC];//*trees[CANTPROC];
@@ -190,7 +190,6 @@ __global__ void gen_arbol(Punto* source){
     printf(" exit proc ");
     int tid = threadIdx.x;
     int first = 1;
-    //OneTree t;
     t[tid].Inicializar();
     for(int i = tid * (LIMITE / CANTPROC); i < tid * (LIMITE / CANTPROC) + TAPP; i++){
         Rect r;// = Rect (source[i].x,source[i].y,source[i].x,source[i].y);
@@ -201,12 +200,7 @@ __global__ void gen_arbol(Punto* source){
     }
     __syncthreads();
 
-    //t.Save("/content/drive/MyDrive/Colab Notebooks/datos/rtree.gpu");
     t[tid].GetRoot(&(rects[tid].min[0]), &(rects[tid].min[1]), &(rects[tid].max[0]), &(rects[tid].max[1]));
-    printf("***%d: xmin %d - ymin %d - xmax %d - ymax %d\n", tid, rects[tid].min[0], rects[tid].min[1], rects[tid].max[0], rects[tid].max[1]);
-    if (tid < 5){
-        printf(" exit proc %d \n", tid);
-    }
 }
 
 int main(){
@@ -240,10 +234,6 @@ int main(){
     cudaMemcpy(dev_puntos, puntos, LIMITE * sizeof(Punto), cudaMemcpyHostToDevice);
     calc_hilbert<<<1,LIMITE>>>(dev_puntos);
     cudaMemcpy(puntos, dev_puntos, LIMITE * sizeof(Punto), cudaMemcpyDeviceToHost);
-    /*for (int i = 0; i < LIMITE; i++){
-      printf ("%d", puntos[i].hilbert);
-      printf ("\n");
-    }*/
 
     cudaFree(dev_puntos);
 // FIN 2
@@ -262,33 +252,19 @@ int main(){
 
     // merge-sort the data
     mergesort(puntos, LIMITE, threadsPerBlock, blocksPerGrid);
-    //
-    // Print out the list
-    //
-    /*for (int i = 0; i < LIMITE; i++) {
-        printf("%i \n" ,puntos[i].hilbert);
-    }*/
 // FIN 3
 
 // 4- Repartir entre los cores para armar árbol r
-printf("%d CANTPROC * SIZEOF(onertree)", CANTPROC * sizeof(OneTree));
 
     OneTree treesCPU[CANTPROC];
 
-for (int p = 0; p < CANTPROC; p++){
-    //trees[p] = new OneTree;
-    //t[p].Inicializar();
-}
 cudaError_t err;
 
     cudaMalloc((void**)&dev_arbol, LIMITE * sizeof(Punto));
 
     cudaMemcpy(dev_arbol, puntos, LIMITE * sizeof(Punto), cudaMemcpyHostToDevice);
-    //cudaMemcpy(dev_tree, trees, sizeof(trees), cudaMemcpyHostToDevice);
 
     gen_arbol<<<1, CANTPROC>>>(dev_arbol); 
-
-    //cudaMemcpy(treesCPU, dev_tree, sizeof(OneTree)*100000, cudaMemcpyDeviceToHost);
     cudaFree(dev_arbol);
      err = cudaGetLastError();
 
@@ -297,34 +273,6 @@ cudaError_t err;
 
         // Possibly: exit(-1) if program cannot continue....
      }
-    
-    /*for (int i = 0; i < CANTPROC; i++){
-        t[i].GetRoot(&(rects[i].min[0]), &(rects[i].min[1]), &(rects[i].max[0]), &(rects[i].max[1]));
-        printf("***%d: xmin %d - ymin %d - xmax %d - ymax %d\n", i, rects[i].min[0], rects[i].min[1], rects[i].max[0], rects[i].max[1]);
-    }*/
-
-    //Rect search_rect = Rect (6, 0, 8, 6);
-    Rect search_rect;// = Rect (source[i].x,source[i].y,source[i].x,source[i].y);
-        search_rect.min[0] = 6;
-        search_rect.max[0] = 8;
-        search_rect.min[1] = 0;
-        search_rect.max[1] = 6;
-    
-    int callback[LIMITE];
-
-printf("Antes de search CPU\n");
-
-    //nhits = (treesCPU[0]).Search(search_rect.min, search_rect.max, callback);
-    printf("Search resulted in %d hits\n", nhits);
-
-printf("Antes de cudafree CPU\n");
-
-    err = cudaGetLastError();
-     if ( err != cudaSuccess ){
-        printf("CUDA Error: %s\n", cudaGetErrorString(err));       
-
-        // Possibly: exit(-1) if program cannot continue....
-     }
-printf("des de cudafree CPU");
+   
     return 0;
 }
